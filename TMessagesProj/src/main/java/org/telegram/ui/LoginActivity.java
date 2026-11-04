@@ -2014,11 +2014,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 .show();
         }
 
-        // Semaphore: a person signs in by name@station, not by a phone number.
+        // Semaphore: a person signs in by the address user.domain.tld, not by a phone number.
         // Strings are plain until the first sign-in works end to end.
         private void addStationField(Context context) {
             titleView.setText("Sign in");
-            subtitleView.setText("Enter your address on the station, name@station.");
+            subtitleView.setText("Enter your address on the station, user.domain.tld.");
             countryOutlineView.setVisibility(GONE);
             phoneOutlineView.setVisibility(GONE);
             stationOutlineView = new OutlineTextContainerView(context);
@@ -2052,7 +2052,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         private void sendStationCode() {
             String name = stationField.getText().toString().trim();
-            if (name.indexOf('@') <= 0) {
+            // People write the address as @user.domain.tld; the @ is not part of it.
+            if (name.startsWith("@")) {
+                name = name.substring(1);
+            }
+            if (name.indexOf('.') <= 0) {
                 onFieldError(stationOutlineView, true);
                 return;
             }

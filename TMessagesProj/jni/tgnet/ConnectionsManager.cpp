@@ -2803,7 +2803,8 @@ void ConnectionsManager::processRequestQueue(uint32_t connectionTypes, uint32_t 
                 }
                 uint8_t index;
                 RAND_bytes(&index, 1);
-                datacenterId = allDc[index % allDc.size()];
+                // Semaphore: a station is the only data center, so it stays the one to try.
+                datacenterId = allDc.empty() ? datacenterId : allDc[index % allDc.size()];
                 if (dynamic_cast<TL_help_getConfig *>(request->rawRequest)) {
                     updatingDcStartTime = currentTime;
                     request->datacenterId = datacenterId;
