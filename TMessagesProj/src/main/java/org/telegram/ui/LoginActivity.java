@@ -1967,6 +1967,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private ImageView chevronRight;
         private CheckBoxCell syncContactsBox;
         private CheckBoxCell testBackendCheckBox;
+        private OutlineTextContainerView stationOutlineView;
+        private EditTextBoldCursor stationField;
 
         @CountryState
         private int countryState = COUNTRY_STATE_NOT_SET_OR_VALID;
@@ -2010,6 +2012,71 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     }
                 })
                 .show();
+        }
+
+        // Semaphore: a person signs in by name@station, not by a phone number.
+        // Strings are plain until the first sign-in works end to end.
+        private void addStationField(Context context) {
+            titleView.setText("Sign in");
+            subtitleView.setText("Enter your address on the station, name@station.");
+            countryOutlineView.setVisibility(GONE);
+            phoneOutlineView.setVisibility(GONE);
+            stationOutlineView = new OutlineTextContainerView(context);
+            stationOutlineView.setText("Address");
+            stationField = new EditTextBoldCursor(context);
+            stationField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+            stationField.setCursorSize(AndroidUtilities.dp(20));
+            stationField.setCursorWidth(1.5f);
+            stationField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            stationField.setMaxLines(1);
+            stationField.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+            stationField.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+            stationField.setBackground(null);
+            stationField.setPadding(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), 0);
+            stationField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            stationField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
+            stationField.setContentDescription("Address");
+            stationField.setOnFocusChangeListener((v, focused) ->
+                    stationOutlineView.animateSelection(focused || stationField.length() > 0 ? 1f : 0f));
+            stationField.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    onNextPressed(null);
+                    return true;
+                }
+                return false;
+            });
+            stationOutlineView.addView(stationField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 36, Gravity.CENTER_VERTICAL));
+            stationOutlineView.attachEditText(stationField);
+            addView(stationOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 24, 16, 8));
+        }
+
+        private void sendStationCode() {
+            String name = stationField.getText().toString().trim();
+            if (name.indexOf('@') <= 0) {
+                onFieldError(stationOutlineView, true);
+                return;
+            }
+            ConnectionsManager.getInstance(currentAccount).cleanup(false);
+            TLRPC.TL_auth_sendCode req = new TLRPC.TL_auth_sendCode();
+            req.api_hash = BuildVars.APP_HASH;
+            req.api_id = BuildVars.APP_ID;
+            req.phone_number = name;
+            req.settings = new TLRPC.TL_codeSettings();
+            Bundle params = new Bundle();
+            params.putString("phone", name);
+            params.putString("ephone", name);
+            params.putString("phoneFormated", name);
+            nextPressed = true;
+            int reqId = ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+                nextPressed = false;
+                if (error == null) {
+                    fillNextCodeParams(params, (TLRPC.auth_SentCode) response);
+                } else {
+                    needShowAlert("Sign in", error.text);
+                }
+                needHideProgress(false);
+            }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc | ConnectionsManager.RequestFlagEnableUnauthorized);
+            needShowProgress(reqId);
         }
 
         public PhoneView(Context context) {
@@ -2107,6 +2174,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, 16, 8));
             phoneOutlineView.setText(getString(R.string.PhoneNumber));
             addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 8, 16, 8));
+            if (activityMode == MODE_LOGIN) {
+                addStationField(context);
+            }
 
             plusTextView = new TextView(context);
             plusTextView.setText("+");
@@ -2860,6 +2930,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             if (getParentActivity() == null || nextPressed || isRequestingFirebaseSms) {
                 return;
             }
+            if (stationField != null) {
+                sendStationCode();
+                return;
+            }
 
             TelephonyManager tm = (TelephonyManager) ApplicationLoader.applicationContext.getSystemService(Context.TELEPHONY_SERVICE);
             if (BuildVars.DEBUG_VERSION) {
@@ -3249,6 +3323,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         private boolean numberFilled;
         public void fillNumber() {
+            if (stationField != null) {
+                return;
+            }
             if (numberFilled || activityMode != MODE_LOGIN) {
                 return;
             }
@@ -3375,6 +3452,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 syncContactsBox.setChecked(syncContacts, false);
             }
             AndroidUtilities.runOnUIThread(() -> {
+                if (stationField != null) {
+                    stationField.requestFocus();
+                    showKeyboard(stationField);
+                    return;
+                }
                 if (phoneField != null) {
                     if (needRequestPermissions) {
                         codeField.clearFocus();

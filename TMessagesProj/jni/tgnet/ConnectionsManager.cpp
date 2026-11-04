@@ -6,6 +6,7 @@
  * Copyright Nikolai Kudashov, 2015-2018.
  */
 
+#include "StationConfig.h"
 #include <cassert>
 #include <cstdlib>
 #include <sys/eventfd.h>
@@ -438,7 +439,7 @@ void ConnectionsManager::loadConfig() {
             RAND_bytes((uint8_t *) &pushSessionId, 8);
         }
         if (currentDatacenterId == 0) {
-            currentDatacenterId = 2;
+            currentDatacenterId = STATION_DC;
         }
         saveConfig();
     }
@@ -1818,6 +1819,13 @@ uint8_t ConnectionsManager::getIpStratagy() {
 
 void ConnectionsManager::initDatacenters() {
     Datacenter *datacenter;
+    // Semaphore: one station stands in for Telegram's data centers.
+    if (datacenters.find(STATION_DC) == datacenters.end()) {
+        datacenter = new Datacenter(instanceNum, STATION_DC);
+        datacenter->addAddressAndPort(STATION_HOST, STATION_PORT, 0, "");
+        datacenters[STATION_DC] = datacenter;
+    }
+    return;
     if (!testBackend) {
         if (datacenters.find(1) == datacenters.end()) {
             datacenter = new Datacenter(instanceNum, 1);

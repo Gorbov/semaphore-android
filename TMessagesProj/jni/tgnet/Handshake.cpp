@@ -6,6 +6,7 @@
  * Copyright Nikolai Kudashov, 2015-2018.
  */
 
+#include "StationConfig.h"
 #include <stdlib.h>
 #include <algorithm>
 #include <memory>
@@ -362,6 +363,11 @@ void Handshake::processHandshakeResponse_resPQ(TLObject *message, int64_t messag
                 }
             }
         } else {
+            // Semaphore: the station's key is the only one trusted.
+            if (serverPublicKeys.empty()) {
+                serverPublicKeys.emplace_back(STATION_RSA_KEY);
+                serverPublicKeysFingerprints.push_back(STATION_RSA_FINGERPRINT);
+            }
             if (serverPublicKeys.empty()) {
                 if (ConnectionsManager::getInstance(currentDatacenter->instanceNum).testBackend) {
                     serverPublicKeys.emplace_back("-----BEGIN RSA PUBLIC KEY-----\n"
