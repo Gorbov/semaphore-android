@@ -23394,6 +23394,11 @@ public class ChatActivity extends BaseFragment implements
                 long prevLinkedChatId = chatInfo != null ? chatInfo.linked_chat_id : 0;
                 chatInfo = chatFull;
                 gotChatInfo();
+                // Semaphore: a pin known before the chat's card was loaded hid its bar for good
+                // (updatePinnedMessageView hides while chatInfo is null and nothing called it again).
+                if (currentPinnedMessageId != 0 && pinnedMessageView == null) {
+                    updatePinnedMessageView(true);
+                }
                 if (ChatObject.isBoostSupported(currentChat) && !ChatObject.isMonoForum(currentChat) /*chatMode != MODE_SUGGESTIONS*/) {
                     getMessagesController().getBoostsController().getBoostsStats(dialog_id, boostsStatus -> {
                         if (boostsStatus == null) {
